@@ -38,6 +38,13 @@ const bazookaImg = new Image();
 bazookaImg.src = "images/bazooka.png";
 
 
+/* ========= AUDIO ========= */
+
+const music = new Audio("music.mp3");
+music.loop = true;
+music.volume = 0.5;
+
+
 /* ========= GAME STATE ========= */
 
 let started = false;
@@ -71,10 +78,14 @@ function moveRight() { granny.targetX = granny.defaultX + 60; }
 /* ========= INPUT ========= */
 
 document.addEventListener("keydown", e => {
-    if (!started) { started = true; return; }
+    if (!started) {
+        started = true;
+        music.play();
+        return;
+    }
     switch (e.code) {
         case "Space":
-        case "ArrowUp":   flap();      break;
+        case "ArrowUp":    flap();      break;
         case "ArrowLeft":  moveLeft();  break;
         case "ArrowRight": moveRight(); break;
     }
@@ -83,6 +94,7 @@ document.addEventListener("keydown", e => {
 canvas.addEventListener("click", () => {
     if (gameOver) { restart(); return; }
     started = true;
+    music.play();
     flap();
 });
 
@@ -147,6 +159,7 @@ function update() {
         b.x -= speed * 3;
         if (hit(granny, b)) {
             gameOver = true;
+            music.pause();
             if (distance > bestScore) {
                 bestScore = Math.floor(distance);
                 localStorage.setItem("best", bestScore);
@@ -175,7 +188,7 @@ function draw() {
         ctx.fillStyle = "white";
         ctx.textAlign = "center";
         ctx.font = `${20 * scaleRatio}px monospace`;
-        ctx.fillText("RIP MY GRANNY ", canvas.width / 2, canvas.height / 2 - 20);
+        ctx.fillText("RIP MY GRANNY", canvas.width / 2, canvas.height / 2 - 20);
         ctx.font = `${16 * scaleRatio}px monospace`;
         ctx.fillText("HIT THE HOOKAH TO START", canvas.width / 2, canvas.height / 2 + 20);
         ctx.textAlign = "left";
@@ -202,15 +215,15 @@ function draw() {
 
     const ui1 = `DIST: ${Math.floor(distance)}m`;
     ctx.strokeText(ui1, 10 * scaleRatio, 20 * scaleRatio);
-    ctx.fillText(ui1,  10 * scaleRatio, 20 * scaleRatio);
+    ctx.fillText(ui1,   10 * scaleRatio, 20 * scaleRatio);
 
     const ui2 = `SPEED: ${speed.toFixed(1)}x`;
     ctx.strokeText(ui2, 10 * scaleRatio, 38 * scaleRatio);
-    ctx.fillText(ui2,  10 * scaleRatio, 38 * scaleRatio);
+    ctx.fillText(ui2,   10 * scaleRatio, 38 * scaleRatio);
 
     const ui3 = `BEST: ${bestScore}`;
     ctx.strokeText(ui3, 10 * scaleRatio, 56 * scaleRatio);
-    ctx.fillText(ui3,  10 * scaleRatio, 56 * scaleRatio);
+    ctx.fillText(ui3,   10 * scaleRatio, 56 * scaleRatio);
 
     /* GAME OVER */
     if (gameOver) {
@@ -246,6 +259,8 @@ function restart() {
     granny.x = granny.defaultX;
     granny.velY = 0;
     granny.targetX = granny.defaultX;
+    music.currentTime = 0;
+    music.play();
 }
 
 
@@ -257,4 +272,4 @@ function loop() {
     requestAnimationFrame(loop);
 }
 
-loop();S
+loop();
