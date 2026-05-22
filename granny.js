@@ -37,6 +37,11 @@ bgImg.src = "images/bg daytime.png";
 const bazookaImg = new Image();
 bazookaImg.src = "images/bazooka.png";
 
+const coinSpin = new Image();
+coinSpin.src = "images/coins.png";
+
+const sunflowerImg = new Image();
+sunflowerImg.src = "images/sunflower.png";
 
 /* ========= AUDIO ========= */
 
@@ -55,6 +60,17 @@ let speed = 1;
 let bgX1 = 0;
 let bgX2 = GRANNY_WIDTH;
 
+let stage = 1;
+
+let collectibles = [];
+
+let collected = 0;
+
+const stage1Goal = 20;
+
+const stage2Goal = 15;
+
+let coinFrame = 0;
 
 /* ========= PLAYER ========= */
 
@@ -120,7 +136,20 @@ a.y+a.height-padding > b.y
 );
 
 }
+function spawnBazooka() {
+    const y = Math.random() * (GRANNY_HEIGHT - 32);
+    bazookas.push({ x: GRANNY_WIDTH + 50, y: y, width: 32, height: 32 });
+}
 
+function spawnCollectible() {
+    collectibles.push({
+        x: GRANNY_WIDTH + 50,
+        y: Math.random() * (GRANNY_HEIGHT - 40),
+        width: 32,
+        height: 32,
+        remove: false
+    });
+}
 
 /* ========= UPDATE ========= */
 
@@ -128,6 +157,7 @@ let spawnTimer = 0;
 
 function update() {
     if (!started || gameOver) return;
+    coinFrame = (coinFrame + 0.1) % 4;
 
     distance += 0.1;
     speed += 0.0003;
@@ -169,6 +199,19 @@ function update() {
     });
 
     bazookas = bazookas.filter(b => b.x > -50);
+    if (Math.random() < 0.01) { spawnCollectible(); }
+
+collectibles.forEach(c => {
+    c.x -= speed * 2;
+    if (hit(granny, c)) { collected++; c.remove = true; }
+});
+collectibles = collectibles.filter(c => !c.remove);
+
+if (stage === 1 && collected >= stage1Goal) {
+    stage = 2;
+    collected = 0;
+    bgImg.src = "images/bg lvl2.jpg";
+}
     granny.tilt = granny.velY * 0.06;
 }
 
@@ -200,6 +243,15 @@ function draw() {
     bazookas.forEach(b => {
         ctx.drawImage(bazookaImg, b.x * scaleRatio, b.y * scaleRatio, b.width * scaleRatio, b.height * scaleRatio);
     });
+    /* COLLECTIBLES */
+collectibles.forEach(c => {
+    if (stage === 1) {
+        ctx.drawImage(coinSpin, Math.floor(coinFrame) * 32, 0, 32, 32,
+            c.x * scaleRatio, c.y * scaleRatio, 32 * scaleRatio, 32 * scaleRatio);
+    } else {
+        ctx.drawImage(sunflowerImg, c.x * scaleRatio, c.y * scaleRatio, 32 * scaleRatio, 32 * scaleRatio);
+    }
+});
 
     /* GRANNY */
     ctx.save();
@@ -223,6 +275,9 @@ function draw() {
     ctx.fillText(ui2,   10 * scaleRatio, 38 * scaleRatio);
 
     const ui3 = `BEST: ${bestScore}`;
+    const goalText = stage === 1 ? `COINS: ${collected}/${stage1Goal}` : `SUNFLOWERS: ${collected}/${stage2Goal}`;
+ctx.strokeText(goalText, 10 * scaleRatio, 74 * scaleRatio);
+ctx.fillText(goalText,   10 * scaleRatio, 74 * scaleRatio);
     ctx.strokeText(ui3, 10 * scaleRatio, 56 * scaleRatio);
     ctx.fillText(ui3,   10 * scaleRatio, 56 * scaleRatio);
 
