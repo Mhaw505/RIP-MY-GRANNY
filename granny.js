@@ -32,7 +32,7 @@ const grannyImg = new Image();
 grannyImg.src = "images/granny.png";
 
 const bgImg = new Image();
-bgImg.src = "images/bg daytime.jpeg";
+bgImg.src = "images/bg daytime.png";
 
 const bazookaImg = new Image();
 bazookaImg.src = "images/bazooka.png";
