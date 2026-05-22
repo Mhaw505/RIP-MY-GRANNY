@@ -103,21 +103,22 @@ canvas.addEventListener("click", () => {
 
 let bazookas = [];
 
-function spawnBazooka() {
-    const y = Math.random() * (GRANNY_HEIGHT - 40);
-    bazookas.push({ x: GRANNY_WIDTH + 50, y, width: 30, height: 30 });
-}
+function hit(a,b){
 
+const padding = 8;
 
-/* ========= COLLISION ========= */
+return(
 
-function hit(a, b) {
-    return (
-        a.x < b.x + b.width &&
-        a.x + a.width > b.x &&
-        a.y < b.y + b.height &&
-        a.y + a.height > b.y
-    );
+a.x + padding < b.x+b.width &&
+
+a.x+a.width-padding > b.x &&
+
+a.y + padding < b.y+b.height &&
+
+a.y+a.height-padding > b.y
+
+);
+
 }
 
 
