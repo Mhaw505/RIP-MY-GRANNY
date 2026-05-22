@@ -131,8 +131,8 @@ function spawnCollectible() {
     collectibles.push({
         x: GRANNY_WIDTH + 50,
         y: Math.random() * (GRANNY_HEIGHT - 40),
-        width: 32,
-        height: 32,
+        width: 20,
+        height: 20,
         remove: false
     });
 }
@@ -182,7 +182,7 @@ let spawnTimer = 0;
 function update() {
     if (!started || gameOver || levelComplete) return;
 
-    coinFrame = (coinFrame + 0.1) % 4;
+    coinFrame = (coinFrame + 0.08) % 6; 
 
     distance += 0.1;
     speed += stage === 2 ? 0.0006 : 0.0003; // faster acceleration in stage 2
@@ -195,7 +195,8 @@ function update() {
     if (spawnTimer >= interval) { spawnTimer = 0; spawnBazooka(); }
 
     // Collectible spawn
-    if (Math.random() < 0.012) { spawnCollectible(); }
+    
+    if (Math.random() < 0.008) { spawnCollectible(); }
 
     /* PLAYER */
     granny.velY += granny.gravity;
@@ -277,11 +278,12 @@ function draw() {
     /* COLLECTIBLES */
     collectibles.forEach(c => {
         if (stage === 1) {
+            const frameW = coinSpin.width / 6;
             ctx.drawImage(
                 coinSpin,
-                Math.floor(coinFrame) * 32, 0, 32, 32,
-                c.x * scaleRatio, c.y * scaleRatio, 32 * scaleRatio, 32 * scaleRatio
-            );
+                   Math.floor(coinFrame) * frameW, 0, frameW, coinSpin.height,
+                   c.x * scaleRatio, c.y * scaleRatio, 20 * scaleRatio, 20 * scaleRatio
+                    );
         } else {
             ctx.drawImage(sunflowerImg, c.x * scaleRatio, c.y * scaleRatio, 32 * scaleRatio, 32 * scaleRatio);
         }
