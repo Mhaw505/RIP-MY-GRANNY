@@ -1,403 +1,180 @@
 const canvas = document.getElementById("granny");
 const ctx = canvas.getContext("2d");
 
-const GRANNY_WIDTH = 600;
-const GRANNY_HEIGHT = 200;
+// --- 1. USE A REAL ASPECT RATIO ---
+const GAME_W = 960;  // was 600
+const GAME_H = 540;  // was 200 - now 16:9
 
 let scaleRatio = 1;
-
-/* ========= SCREEN ========= */
 
 function getScaleRatio() {
     const screenHeight = Math.min(window.innerHeight, document.documentElement.clientHeight);
     const screenWidth = Math.min(window.innerWidth, document.documentElement.clientWidth);
-    const scaleX = screenWidth / GRANNY_WIDTH;
-    const scaleY = screenHeight / GRANNY_HEIGHT;
-    return Math.min(scaleX, scaleY);
+    return Math.min(screenWidth / GAME_W, screenHeight / GAME_H);
 }
 
 function setScreen() {
     scaleRatio = getScaleRatio();
-    canvas.width = GRANNY_WIDTH * scaleRatio;
-    canvas.height = GRANNY_HEIGHT * scaleRatio;
+    canvas.width = GAME_W * scaleRatio;
+    canvas.height = GAME_H * scaleRatio;
+    canvas.style.display = 'block';
+    canvas.style.margin = '0 auto';
+    // crisp pixel art
+    ctx.imageSmoothingEnabled = false;
 }
-
 setScreen();
 window.addEventListener("resize", setScreen);
 
-
 /* ========= IMAGES ========= */
-
-const grannyImg = new Image();
-grannyImg.src = "images/granny.png";
-
-const bgImg = new Image();
-bgImg.src = "images/bg daytime.png";
-
-const bazookaImg = new Image();
-bazookaImg.src = "images/bazooka.png";
-
-const coinSpin = new Image();
-coinSpin.src = "images/coins.png";
-
-const sunflowerImg = new Image();
-sunflowerImg.src = "images/sunflower.png";
-
+const grannyImg = new Image(); grannyImg.src = "images/granny.png";
+const bgImg = new Image(); bgImg.src = "images/bg daytime.png";
+const bazookaImg = new Image(); bazookaImg.src = "images/bazooka.png";
+const coinSpin = new Image(); coinSpin.src = "images/coins.png";
+const sunflowerImg = new Image(); sunflowerImg.src = "images/sunflower.png";
 
 /* ========= AUDIO ========= */
-
-const music1 = new Audio("music.mp3");
-music1.loop = true;
-music1.volume = 0.5;
-
-const music2 = new Audio("music_lvl2.mp3");
-music2.loop = true;
-music2.volume = 0.5;
-
-let music = music1; // active track
-
+const music1 = new Audio("music.mp3"); music1.loop = true; music1.volume = 0.5;
+const music2 = new Audio("music_lvl2.mp3"); music2.loop = true; music2.volume = 0.5;
+let music = music1;
 
 /* ========= GAME STATE ========= */
-
-let started = false;
-let gameOver = false;
-let levelComplete = false;
-let distance = 0;
-let bestScore = Number(localStorage.getItem("best")) || 0;
+let started = false, gameOver = false, levelComplete = false;
+let distance = 0, bestScore = Number(localStorage.getItem("best")) || 0;
 let speed = 1;
-let bgX1 = 0;
-let bgX2 = GRANNY_WIDTH;
+let bgX1 = 0, bgX2 = GAME_W;
+let stage = 1, collectibles = [], collected = 0;
 
-let stage = 1;
-let collectibles = [];
-let collected = 0;
-let coinFrame = 0;
+const stage1Goal = 20, stage2Goal = 15;
 
-const stage1Goal = 20;
-const stage2Goal = 15;
-
-
-/* ========= PLAYER ========= */
-
+/* ========= PLAYER - BIGGER ========= */
 const granny = {
-    width: 32,
-    height: 32,
-    x: 120,
-    defaultX: 120,
-    targetX: 120,
-    y: 80,
+    width: 64,   // was 32
+    height: 64,  // was 32
+    x: 150,
+    defaultX: 150,
+    targetX: 150,
+    y: 200,
     velY: 0,
     gravity: 0.35,
     tilt: 0
 };
 
-function flap() { granny.velY = -5; }
-function moveLeft() { granny.targetX = granny.defaultX - 60; }
-function moveRight() { granny.targetX = granny.defaultX + 60; }
-
+function flap() { granny.velY = -6; }
+function moveLeft() { granny.targetX = granny.defaultX - 80; }
+function moveRight() { granny.targetX = granny.defaultX + 80; }
 
 /* ========= INPUT ========= */
-
 document.addEventListener("keydown", e => {
     if (levelComplete) return;
-    if (!started) {
-        started = true;
-        music.play();
-        return;
-    }
-    switch (e.code) {
-        case "Space":
-        case "ArrowUp":    flap();      break;
-        case "ArrowLeft":  moveLeft();  break;
-        case "ArrowRight": moveRight(); break;
-    }
+    if (!started) { started = true; music.play(); return; }
+    if (e.code === "Space" || e.code === "ArrowUp") flap();
+    if (e.code === "ArrowLeft") moveLeft();
+    if (e.code === "ArrowRight") moveRight();
 });
-
 canvas.addEventListener("click", () => {
     if (levelComplete) return;
     if (gameOver) { restart(); return; }
-    started = true;
-    music.play();
-    flap();
+    started = true; music.play(); flap();
 });
 
-
-/* ========= BAZOOKAS ========= */
-
+/* ========= SPAWN ========= */
 let bazookas = [];
-
 function spawnBazooka() {
-    const y = Math.random() * (GRANNY_HEIGHT - 40);
-    bazookas.push({ x: GRANNY_WIDTH + 50, y, width: 30, height: 30 });
+    bazookas.push({ x: GAME_W + 50, y: Math.random() * (GAME_H - 60), width: 48, height: 48 });
 }
-
-
-/* ========= COLLECTIBLES ========= */
-
 function spawnCollectible() {
-    collectibles.push({
-        x: GRANNY_WIDTH + 50,
-        y: Math.random() * (GRANNY_HEIGHT - 40),
-        width: 32,
-        height: 32,
-        remove: false
-    });
+    collectibles.push({ x: GAME_W + 50, y: Math.random() * (GAME_H - 50), width: 40, height: 40, remove: false });
 }
-
-
-/* ========= COLLISION ========= */
-
-function hit(a, b) {
-    const padding = 6;
-    return (
-        a.x + padding < b.x + b.width &&
-        a.x + a.width - padding > b.x &&
-        a.y + padding < b.y + b.height &&
-        a.y + a.height - padding > b.y
-    );
-}
-
-
-/* ========= STAGE TRANSITION ========= */
-
-function enterStage2() {
-    levelComplete = true;
-    music.pause();
-
-    // show LEVEL COMPLETE for 2.5 seconds then switch
-    setTimeout(() => {
-        stage = 2;
-        collected = 0;
-        collectibles = [];
-        bazookas = [];
-        levelComplete = false;
-
-        bgImg.src = "images/bg lvl2.jpg";
-
-        music1.pause();
-        music = music2;
-        music.currentTime = 0;
-        music.play();
-
-        // Stage 2 difficulty boost
-        speed = Math.max(speed, 1.8);
-    }, 2500);
-}
-
+function hit(a,b){ const p=4; return a.x+p<b.x+b.width && a.x+a.width-p>b.x && a.y+p<b.y+b.height && a.y+a.height-p>b.y; }
 
 /* ========= UPDATE ========= */
-
 let spawnTimer = 0;
-
 function update() {
     if (!started || gameOver || levelComplete) return;
-
-    coinFrame = (coinFrame + 0.1) % 4;
-
     distance += 0.1;
-    speed += stage === 2 ? 0.0006 : 0.0003; // faster acceleration in stage 2
+    speed += stage === 2 ? 0.0006 : 0.0003;
     if (speed > 4.5) speed = 4.5;
 
     spawnTimer++;
     let interval = 80 - (speed * 10);
-    if (stage === 2) interval *= 0.75; // more bazookas in stage 2
-    if (interval < 20) interval = 20;
-    if (spawnTimer >= interval) { spawnTimer = 0; spawnBazooka(); }
+    if (stage === 2) interval *= 0.75;
+    if (spawnTimer > Math.max(20, interval)) { spawnTimer = 0; spawnBazooka(); }
+    if (Math.random() < 0.012) spawnCollectible();
 
-    // Collectible spawn
-    if (Math.random() < 0.012) { spawnCollectible(); }
-
-    /* PLAYER */
     granny.velY += granny.gravity;
     granny.y += granny.velY;
     granny.x += (granny.targetX - granny.x) * 0.12;
     granny.targetX += (granny.defaultX - granny.targetX) * 0.08;
+    granny.y = Math.max(0, Math.min(GAME_H - granny.height, granny.y));
 
-    if (granny.y < 0) granny.y = 0;
-    if (granny.y > GRANNY_HEIGHT - granny.height) granny.y = GRANNY_HEIGHT - granny.height;
-    if (granny.x < 0) granny.x = 0;
-    if (granny.x > GRANNY_WIDTH - granny.width) granny.x = GRANNY_WIDTH - granny.width;
+    // --- 2. SEAMLESS BACKGROUND ---
+    bgX1 -= speed; bgX2 -= speed;
+    if (bgX1 <= -GAME_W) bgX1 = bgX2 + GAME_W - 1; // -1 overlap kills the line
+    if (bgX2 <= -GAME_W) bgX2 = bgX1 + GAME_W - 1;
 
-    /* BACKGROUND */
-    bgX1 -= speed;
-    bgX2 -= speed;
-    if (bgX1 <= -GRANNY_WIDTH) bgX1 = bgX2 + GRANNY_WIDTH;
-    if (bgX2 <= -GRANNY_WIDTH) bgX2 = bgX1 + GRANNY_WIDTH;
+    bazookas.forEach(b => { b.x -= speed * 3; if (hit(granny,b)) { gameOver=true; music.pause(); bestScore=Math.max(bestScore,Math.floor(distance)); localStorage.setItem("best",bestScore);} });
+    bazookas = bazookas.filter(b => b.x > -60);
 
-    /* BAZOOKAS */
-    bazookas.forEach(b => {
-        b.x -= speed * 3;
-        if (hit(granny, b)) {
-            gameOver = true;
-            music.pause();
-            if (distance > bestScore) {
-                bestScore = Math.floor(distance);
-                localStorage.setItem("best", bestScore);
-            }
-        }
-    });
-    bazookas = bazookas.filter(b => b.x > -50);
-
-    /* COLLECTIBLES */
-    collectibles.forEach(c => {
-        c.x -= speed * 2;
-        if (hit(granny, c)) {
-            collected++;
-            c.remove = true;
-        }
-    });
+    collectibles.forEach(c => { c.x -= speed * 2; if (hit(granny,c)) { collected++; c.remove=true; } });
     collectibles = collectibles.filter(c => !c.remove && c.x > -50);
 
-    /* STAGE COMPLETE CHECK */
-    if (stage === 1 && collected >= stage1Goal) {
-        enterStage2();
-    }
-
-    granny.tilt = granny.velY * 0.06;
+    if (stage === 1 && collected >= stage1Goal) enterStage2();
+    granny.tilt = granny.velY * 0.05;
 }
-
 
 /* ========= DRAW ========= */
-
 function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    /* BG */
-    ctx.drawImage(bgImg, bgX1 * scaleRatio, 0, GRANNY_WIDTH * scaleRatio, GRANNY_HEIGHT * scaleRatio);
-    ctx.drawImage(bgImg, bgX2 * scaleRatio, 0, GRANNY_WIDTH * scaleRatio, GRANNY_HEIGHT * scaleRatio);
+    // background - use floor to avoid sub-pixel gaps
+    ctx.drawImage(bgImg, Math.floor(bgX1*scaleRatio),0, GAME_W*scaleRatio, GAME_H*scaleRatio);
+    ctx.drawImage(bgImg, Math.floor(bgX2*scaleRatio),0, GAME_W*scaleRatio, GAME_H*scaleRatio);
 
-    /* START SCREEN */
     if (!started) {
-        ctx.fillStyle = "rgba(0,0,0,0.5)";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = "white";
-        ctx.textAlign = "center";
-        ctx.font = `${20 * scaleRatio}px monospace`;
-        ctx.fillText("RIP MY GRANNY", canvas.width / 2, canvas.height / 2 - 20);
-        ctx.font = `${16 * scaleRatio}px monospace`;
-        ctx.fillText("HIT THE HOOKAH TO START", canvas.width / 2, canvas.height / 2 + 20);
-        ctx.textAlign = "left";
+        ctx.fillStyle="rgba(0,0,0,0.5)"; ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle="white"; ctx.textAlign="center";
+        ctx.font=`${28*scaleRatio}px monospace`;
+        ctx.fillText("RIP MY GRANNY", canvas.width/2, canvas.height/2 - 20);
+        ctx.font=`${18*scaleRatio}px monospace`;
+        ctx.fillText("CLICK OR SPACE TO START", canvas.width/2, canvas.height/2 + 30);
         return;
     }
 
-    /* BAZOOKAS */
-    bazookas.forEach(b => {
-        ctx.drawImage(bazookaImg, b.x * scaleRatio, b.y * scaleRatio, b.width * scaleRatio, b.height * scaleRatio);
-    });
+    bazookas.forEach(b => ctx.drawImage(bazookaImg, b.x*scaleRatio, b.y*scaleRatio, b.width*scaleRatio, b.height*scaleRatio));
 
-    /* COLLECTIBLES */
+    // --- 3. DRAW WHOLE COIN, NOT SPRITE SLICE ---
     collectibles.forEach(c => {
-        if (stage === 1) {
-            ctx.drawImage(
-                coinSpin,
-                Math.floor(coinFrame) * 32, 0, 32, 32,
-                c.x * scaleRatio, c.y * scaleRatio, 32 * scaleRatio, 32 * scaleRatio
-            );
-        } else {
-            ctx.drawImage(sunflowerImg, c.x * scaleRatio, c.y * scaleRatio, 32 * scaleRatio, 32 * scaleRatio);
-        }
+        const img = stage === 1 ? coinSpin : sunflowerImg;
+        ctx.drawImage(img, c.x*scaleRatio, c.y*scaleRatio, c.width*scaleRatio, c.height*scaleRatio);
     });
 
-    /* GRANNY */
+    // --- 4. BIGGER GRANNY ---
     ctx.save();
-    ctx.translate((granny.x + granny.width / 2) * scaleRatio, (granny.y + granny.height / 2) * scaleRatio);
+    ctx.translate((granny.x+granny.width/2)*scaleRatio, (granny.y+granny.height/2)*scaleRatio);
     ctx.rotate(granny.tilt);
-    ctx.drawImage(grannyImg, -16 * scaleRatio, -16 * scaleRatio, 32 * scaleRatio, 32 * scaleRatio);
+    ctx.drawImage(grannyImg, -granny.width/2*scaleRatio, -granny.height/2*scaleRatio, granny.width*scaleRatio, granny.height*scaleRatio);
     ctx.restore();
 
-    /* UI */
-    ctx.fillStyle = "white";
-    ctx.strokeStyle = "black";
-    ctx.lineWidth = 3;
-    ctx.font = `${14 * scaleRatio}px monospace`;
+    // UI - moved in 20px so it doesn't get cut
+    ctx.fillStyle="white"; ctx.strokeStyle="black"; ctx.lineWidth=3; ctx.font=`${18*scaleRatio}px monospace`;
+    ["DIST: "+Math.floor(distance)+"m","SPEED: "+speed.toFixed(1)+"x","BEST: "+bestScore,`${stage===1?"COINS":"FLOWERS"}: ${collected}/${stage===1?stage1Goal:stage2Goal}`]
+      .forEach((t,i)=>{ const y=(25+i*28)*scaleRatio; ctx.strokeText(t,20*scaleRatio,y); ctx.fillText(t,20*scaleRatio,y); });
 
-    const ui1 = `DIST: ${Math.floor(distance)}m`;
-    ctx.strokeText(ui1, 10 * scaleRatio, 20 * scaleRatio);
-    ctx.fillText(ui1,   10 * scaleRatio, 20 * scaleRatio);
-
-    const ui2 = `SPEED: ${speed.toFixed(1)}x`;
-    ctx.strokeText(ui2, 10 * scaleRatio, 38 * scaleRatio);
-    ctx.fillText(ui2,   10 * scaleRatio, 38 * scaleRatio);
-
-    const ui3 = `BEST: ${bestScore}`;
-    ctx.strokeText(ui3, 10 * scaleRatio, 56 * scaleRatio);
-    ctx.fillText(ui3,   10 * scaleRatio, 56 * scaleRatio);
-
-    const goalLabel = stage === 1 ? "COINS" : "FLOWERS";
-    const goalCount = stage === 1 ? stage1Goal : stage2Goal;
-    const ui4 = `${goalLabel}: ${collected}/${goalCount}`;
-    ctx.strokeText(ui4, 10 * scaleRatio, 74 * scaleRatio);
-    ctx.fillText(ui4,   10 * scaleRatio, 74 * scaleRatio);
-
-    /* LEVEL COMPLETE SCREEN */
-    if (levelComplete) {
-        ctx.fillStyle = "rgba(0,0,0,0.75)";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = "gold";
-        ctx.textAlign = "center";
-        ctx.font = `${24 * scaleRatio}px monospace`;
-        ctx.fillText("⭐ LEVEL COMPLETE ⭐", canvas.width / 2, canvas.height / 2 - 20);
-        ctx.fillStyle = "white";
-        ctx.font = `${14 * scaleRatio}px monospace`;
-        ctx.fillText("Stage 2 incoming...", canvas.width / 2, canvas.height / 2 + 16);
-        ctx.textAlign = "left";
-        return;
-    }
-
-    /* GAME OVER */
-    if (gameOver) {
-        ctx.fillStyle = "rgba(255,255,255,0.92)";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = "black";
-        ctx.textAlign = "center";
-
-        ctx.font = `${22 * scaleRatio}px monospace`;
-        ctx.fillText("GRANNY GOT HIT BY A BAZOOKA 💔", canvas.width / 2, canvas.height / 2 - 40);
-
-        ctx.font = `${16 * scaleRatio}px monospace`;
-        ctx.fillText(`DIST: ${Math.floor(distance)}m`, canvas.width / 2, canvas.height / 2);
-        ctx.fillText(`BEST: ${bestScore}`,             canvas.width / 2, canvas.height / 2 + 28);
-
-        ctx.font = `${14 * scaleRatio}px monospace`;
-        ctx.fillText("CLICK TO RESTART", canvas.width / 2, canvas.height / 2 + 60);
-
-        ctx.textAlign = "left";
+    if (levelComplete || gameOver) {
+        ctx.fillStyle = levelComplete ? "rgba(0,0,0,0.75)" : "rgba(255,255,255,0.92)";
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle = levelComplete ? "gold" : "black";
+        ctx.textAlign="center";
+        ctx.font=`${28*scaleRatio}px monospace`;
+        ctx.fillText(levelComplete ? "⭐ LEVEL COMPLETE ⭐" : "GRANNY GOT HIT 💔", canvas.width/2, canvas.height/2 - 20);
     }
 }
 
+/* ========= STAGE & RESTART ========= */
+function enterStage2(){ levelComplete=true; music.pause(); setTimeout(()=>{ stage=2; collected=0; collectibles=[]; bazookas=[]; levelComplete=false; bgImg.src="images/bg lvl2.jpg"; music1.pause(); music=music2; music.currentTime=0; music.play(); speed=Math.max(speed,1.8); },2500); }
+function restart(){ distance=0; speed=1; stage=1; collected=0; collectibles=[]; bazookas=[]; gameOver=false; levelComplete=false; started=false; granny.y=200; granny.velY=0; music2.pause(); music=music1; bgImg.src="images/bg daytime.png"; music.currentTime=0; music.play(); }
 
-/* ========= RESTART ========= */
-
-function restart() {
-    distance = 0;
-    speed = 1;
-    stage = 1;
-    collected = 0;
-    collectibles = [];
-    bazookas = [];
-    gameOver = false;
-    levelComplete = false;
-    started = false;
-    coinFrame = 0;
-    granny.y = 80;
-    granny.x = granny.defaultX;
-    granny.velY = 0;
-    granny.targetX = granny.defaultX;
-
-    music2.pause();
-    music = music1;
-    bgImg.src = "images/bg daytime.png";
-    music.currentTime = 0;
-    music.play();
-}
-
-
-/* ========= LOOP ========= */
-
-function loop() {
-    update();
-    draw();
-    requestAnimationFrame(loop);
-}
-
-loop();
+/* ========= LOOP - WAIT FOR IMAGES ========= */
+let images = [grannyImg,bgImg,bazookaImg,coinSpin,sunflowerImg];
+let loaded = 0; images.forEach(i=>i.onload=()=>{if(++loaded===images.length) loop();});
+function loop(){ update(); draw(); requestAnimationFrame(loop); }
