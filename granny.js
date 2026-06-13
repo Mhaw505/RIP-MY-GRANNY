@@ -23,7 +23,7 @@ let bazookas   = [];
 let spawnTimer = 0;
 
 // Approx top of the grass/ground in the background image (virtual px)
-const GROUND_Y = V_H - 38;
+const GROUND_Y = V_H - 22;
 const granny = {
     width: 32, height: 32,
     x: 120, defaultX: 120, targetX: 120,
